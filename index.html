@@ -1,34 +1,78 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Roblox Control Panel</title>
-    <style>
-      body { font-family: sans-serif; padding: 20px; }
-      input, button { font-size: 16px; padding: 8px; margin: 4px; }
-    </style>
-  </head>
-  <body>
-    <h2>Send Command to Roblox</h2>
-    <input id="command" placeholder="Enter command..." />
-    <button onclick="sendCommand()">Send</button>
-    <p id="status"></p>
+<head>
+<meta charset="UTF-8">
+<title>Mini Score System</title>
+<style>
+  body { font-family:sans-serif; max-width:400px; margin:40px auto; text-align:center; }
+  input,button { padding:8px; margin:4px; width:90%; font-size:16px; }
+</style>
+</head>
+<body>
+<h2>UB Bank for UB</h2>
 
-    <script>
-      const url = "https://script.google.com/macros/s/AKfycbyhhl17SA2FJvwnrSV3zH1b_23Y9IsVE82ucC2pCDGrE5m6UjM1L3uXn3Rt-V31528_Sw/exec";
+<div id="auth">
+  <input id="user" placeholder="Username"><br>
+  <input id="pass" placeholder="Password" type="password"><br>
+  <button onclick="signup()">Sign Up</button>
+  <button onclick="login()">Log In</button>
+  <p id="authMsg"></p>
+</div>
 
-      async function sendCommand() {
-        const command = document.getElementById("command").value.trim();
-        if (!command) return;
+<div id="panel" style="display:none;">
+  <h3>Welcome <span id="me"></span>!</h3>
+  <p>Your score: <span id="score">0</span></p>
+  <input id="toUser" placeholder="Send to username">
+  <input id="amount" placeholder="Amount" type="number">
+  <button onclick="send()">Send Score</button>
+  <p id="msg"></p>
+</div>
 
-        const data = { player: "SERVER", score: command }; // reuse same format
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
+<script>
+const url = "https://script.google.com/macros/s/AKfycby_if-Mlx5EaMRuFALlRxzGfp3_Ccvmnw9xaqBXn36Q0YNqrVpNhRsjqNzdas3ZZSb7RA/exec";
+let username = "", password = "";
 
-        document.getElementById("status").textContent = res.ok ? "✅ Sent!" : "❌ Failed!";
-      }
-    </script>
-  </body>
+async function signup() {
+  const u = val("user"), p = val("pass");
+  const res = await post({ action:"signup", username:u, password:p });
+  msg("authMsg", res);
+}
+
+async function login() {
+  const u = val("user"), p = val("pass");
+  const res = await post({ action:"login", username:u, password:p });
+  if (res.username) {
+    username=u; password=p;
+    showPanel(res);
+  } else msg("authMsg", res);
+}
+
+async function send() {
+  const to = val("toUser");
+  const amt = Number(val("amount"));
+  const res = await post({ action:"send", from:username, password, to, amount:amt });
+  msg("msg", res);
+  refresh();
+}
+
+async function refresh() {
+  const res = await post({ action:"login", username, password });
+  if (res.username) document.getElementById("score").textContent = res.score;
+}
+
+function val(id){ return document.getElementById(id).value.trim(); }
+function msg(id,t){ document.getElementById(id).textContent = typeof t==="string"?t:JSON.stringify(t); }
+function showPanel(u){ 
+  document.getElementById("auth").style.display="none";
+  document.getElementById("panel").style.display="block";
+  document.getElementById("me").textContent=u.username;
+  document.getElementById("score").textContent=u.score;
+}
+
+async function post(data){
+  const r = await fetch(url,{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  return r.json();
+}
+</script>
+</body>
 </html>
