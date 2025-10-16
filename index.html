@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Roblox Data Dashboard</title>
+    <style>
+      body { font-family: sans-serif; padding: 20px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    </style>
+  </head>
+  <body>
+    <h2>Live Roblox Data</h2>
+    <table id="dataTable">
+      <thead><tr><th>Player</th><th>Score</th><th>Timestamp</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <script>
+      const url = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+
+      async function fetchData() {
+        const res = await fetch(url);
+        const data = await res.json();
+        const tbody = document.querySelector("#dataTable tbody");
+        tbody.innerHTML = "";
+        data.slice(-10).reverse().forEach(row => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${row.player}</td><td>${row.score}</td><td>${row.timestamp}</td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      setInterval(fetchData, 5000); // every 5 seconds
+      fetchData(); // initial load
+    </script>
+  </body>
+</html>
