@@ -3,153 +3,158 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>UBBank</title>
+  <title>UB Bank</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #0e0e0e;
-      color: #fff;
+      background: #f7f7f7;
+      color: #222;
       text-align: center;
-      padding: 2em;
+      padding-top: 40px;
     }
-    .box {
-      background: #1a1a1a;
-      padding: 1.5em;
-      border-radius: 10px;
-      width: 300px;
-      margin: 1em auto;
-      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    .container {
+      width: 320px;
+      margin: 0 auto;
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
     input {
-      width: 90%;
-      padding: 10px;
-      margin: 5px 0;
-      border: none;
+      display: block;
+      margin: 10px auto;
+      padding: 8px;
+      width: 80%;
+      border: 1px solid #ccc;
       border-radius: 5px;
     }
     button {
-      width: 95%;
-      padding: 10px;
-      background: #00bfff;
+      margin-top: 10px;
+      padding: 10px 20px;
+      background: #2a7ae2;
+      color: white;
       border: none;
-      border-radius: 5px;
-      color: #fff;
-      font-weight: bold;
+      border-radius: 6px;
       cursor: pointer;
     }
-    #main, #transfer { display: none; }
+    button:hover {
+      background: #1a5bb8;
+    }
+    #userPanel {
+      display: none;
+    }
   </style>
 </head>
 <body>
-  <h1>UBBank</h1>
-
-  <div id="auth" class="box">
-    <h2>Sign Up / Log In</h2>
+  <div class="container" id="authPanel">
+    <h2>UB Bank</h2>
     <input id="username" placeholder="Username" />
     <input id="password" type="password" placeholder="Password" />
     <button onclick="signup()">Sign Up</button>
     <button onclick="login()">Log In</button>
   </div>
 
-  <div id="main" class="box">
-    <h2>Welcome, <span id="userDisplay"></span></h2>
-    <p>Your current score: <b id="scoreDisplay">0</b></p>
-    <input id="scoreInput" type="number" placeholder="Enter new score" />
-    <button onclick="updateScore()">Update Score</button>
-    <button onclick="showTransfer()">Send Score to User</button>
-  </div>
+  <div class="container" id="userPanel">
+    <h2>Welcome, <span id="userNameLabel"></span></h2>
+    <p>Your balance: <b><span id="ubbucksLabel">0</span> UB-bucks</b></p>
 
-  <div id="transfer" class="box">
-    <h2>Send Score</h2>
-    <input id="targetUser" placeholder="Recipient Username" />
-    <input id="amount" type="number" placeholder="Score Amount" />
+    <h3>Send UB-bucks</h3>
+    <input id="targetUser" placeholder="Recipient username" />
+    <input id="amount" type="number" placeholder="Amount" />
     <button onclick="transfer()">Send</button>
-    <button onclick="back()">Back</button>
+
+    <button style="background:#555; margin-top:20px;" onclick="logout()">Log Out</button>
   </div>
 
   <script>
-    //Replace this with your Cloudflare Worker URL:
-    const API_URL = "https://google-proxy.doritoslove1337.workers.dev";
+    const API_URL = "https://google-proxy.doritoslove1337.workers.dev"; // <-- replace with your Worker URL
 
-    let currentUser = null;
-    let currentPassword = null;
-
-    async function post(action, body = {}) {
+    async function post(data) {
       try {
-        const res = await fetch(API_URL, {
+        const response = await fetch(API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action, ...body }),
+          body: JSON.stringify(data)
         });
-        return await res.json();
+        return await response.json();
       } catch (err) {
+        alert("Error communicating with server");
         console.error("POST error:", err);
-        alert("Error communicating with server.");
+        return null;
       }
     }
 
-    async function signup() {
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value.trim();
-      if (!username || !password) return alert("Enter username and password.");
+    function signup() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      post({ action: "signup", username, password }).then(res => {
+        if (res && res.status === "ok") {
+          alert("Signup successful! Please log in.");
+        } else {
+          alert(res?.message || "Error signing up");
+        }
+      });
+    }
 
-      const res = await post("signup", { username, password });
-      if (res.status === "ok") {
-        alert("Signup successful!");
-        login();
-      } else {
-        alert(res.message || "Signup failed");
+    function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      post({ action: "login", username, password }).then(res => {
+        if (res && res.status === "ok") {
+          document.getElementById("authPanel").style.display = "none";
+          document.getElementById("userPanel").style.display = "block";
+          document.getElementById("userNameLabel").innerText = username;
+          document.getElementById("ubbucksLabel").innerText = res.UBbucks || 0;
+          localStorage.setItem("user", JSON.stringify({ username, password }));
+        } else {
+          alert(res?.message || "Login failed");
+        }
+      });
+    }
+
+    function transfer() {
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (!user) return alert("Please log in again.");
+      const targetUser = document.getElementById("targetUser").value;
+      const amount = parseFloat(document.getElementById("amount").value);
+      post({ 
+        action: "transfer", 
+        username: user.username, 
+        password: user.password, 
+        targetUser, 
+        amount 
+      }).then(res => {
+        if (res && res.status === "ok") {
+          alert(res.message);
+          login(); // refresh balance
+        } else {
+          alert(res?.message || "Transfer failed");
+        }
+      });
+    }
+
+    function logout() {
+      localStorage.removeItem("user");
+      document.getElementById("authPanel").style.display = "block";
+      document.getElementById("userPanel").style.display = "none";
+    }
+
+    // Auto-login if stored
+    window.onload = () => {
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (user) {
+        post({ action: "login", username: user.username, password: user.password }).then(res => {
+          if (res && res.status === "ok") {
+            document.getElementById("authPanel").style.display = "none";
+            document.getElementById("userPanel").style.display = "block";
+            document.getElementById("userNameLabel").innerText = user.username;
+            document.getElementById("ubbucksLabel").innerText = res.UBbucks || 0;
+          } else {
+            localStorage.removeItem("user");
+          }
+        });
       }
-    }
-
-    async function login() {
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value.trim();
-      if (!username || !password) return alert("Enter username and password.");
-
-      const res = await post("login", { username, password });
-      if (res.status === "ok") {
-        currentUser = username;
-        currentPassword = password;
-        document.getElementById("auth").style.display = "none";
-        document.getElementById("main").style.display = "block";
-        document.getElementById("userDisplay").innerText = username;
-        document.getElementById("scoreDisplay").innerText = res.score || 0;
-      } else {
-        alert(res.message || "Login failed");
-      }
-    }
-
-    async function updateScore() {
-      const newScore = Number(document.getElementById("scoreInput").value);
-      if (isNaN(newScore)) return alert("Enter a valid score.");
-      const res = await post("updateScore", { username: currentUser, password: currentPassword, score: newScore });
-      if (res.status === "ok") {
-        document.getElementById("scoreDisplay").innerText = newScore;
-        alert("Score updated!");
-      } else {
-        alert(res.message || "Failed to update score.");
-      }
-    }
-
-    function showTransfer() {
-      document.getElementById("main").style.display = "none";
-      document.getElementById("transfer").style.display = "block";
-    }
-
-    async function transfer() {
-      const targetUser = document.getElementById("targetUser").value.trim();
-      const amount = Number(document.getElementById("amount").value);
-      if (!targetUser || isNaN(amount)) return alert("Enter valid details.");
-      const res = await post("transfer", { username: currentUser, password: currentPassword, targetUser, amount });
-      alert(res.message || "Transfer complete.");
-      back();
-    }
-
-    function back() {
-      document.getElementById("transfer").style.display = "none";
-      document.getElementById("main").style.display = "block";
-    }
+    };
   </script>
 </body>
 </html>
