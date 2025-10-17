@@ -43,6 +43,9 @@
     #userPanel {
       display: none;
     }
+    #ubbucksLabel {
+      transition: opacity 0.3s ease;
+    }
   </style>
 </head>
 <body>
@@ -67,8 +70,12 @@
   </div>
 
   <script>
-    const API_URL = "https://google-proxy.doritoslove1337.workers.dev"; // <-- replace with your Worker URL
+    // Replace this with your Cloudflare Worker URL
+    const API_URL = "https://google-proxy.doritoslove1337.workers.dev"; 
 
+    // ----------------------------
+    // Generic POST Helper
+    // ----------------------------
     async function post(data) {
       try {
         const response = await fetch(API_URL, {
@@ -84,6 +91,9 @@
       }
     }
 
+    // ----------------------------
+    // Sign up
+    // ----------------------------
     function signup() {
       const username = document.getElementById("username").value;
       const password = document.getElementById("password").value;
@@ -96,15 +106,15 @@
       });
     }
 
+    // ----------------------------
+    // Log in
+    // ----------------------------
     function login() {
       const username = document.getElementById("username").value;
       const password = document.getElementById("password").value;
       post({ action: "login", username, password }).then(res => {
         if (res && res.status === "ok") {
-          document.getElementById("authPanel").style.display = "none";
-          document.getElementById("userPanel").style.display = "block";
-          document.getElementById("userNameLabel").innerText = username;
-          document.getElementById("ubbucksLabel").innerText = res.UBbucks || 0;
+          showUserPanel(username, res.UBbucks || 0);
           localStorage.setItem("user", JSON.stringify({ username, password }));
         } else {
           alert(res?.message || "Login failed");
@@ -112,11 +122,16 @@
       });
     }
 
+    // ----------------------------
+    // Transfer UB-bucks
+    // ----------------------------
     function transfer() {
       const user = JSON.parse(localStorage.getItem("user"));
       if (!user) return alert("Please log in again.");
       const targetUser = document.getElementById("targetUser").value;
       const amount = parseFloat(document.getElementById("amount").value);
+      if (!targetUser || !amount || amount <= 0) return alert("Enter a valid recipient and amount.");
+
       post({ 
         action: "transfer", 
         username: user.username, 
@@ -126,29 +141,66 @@
       }).then(res => {
         if (res && res.status === "ok") {
           alert(res.message);
-          login(); // refresh balance
+          refreshBalance(); // ✅ instantly refresh after sending
         } else {
           alert(res?.message || "Transfer failed");
         }
       });
     }
 
+    // ----------------------------
+    // Refresh balance
+    // ----------------------------
+    async function refreshBalance() {
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (!user) return;
+      const res = await post({ action: "login", username: user.username, password: user.password });
+      if (res && res.status === "ok") {
+        updateBalanceDisplay(res.UBbucks || 0);
+      }
+    }
+
+    // Smooth fade balance update
+    function updateBalanceDisplay(value) {
+      const el = document.getElementById("ubbucksLabel");
+      el.style.opacity = 0.5;
+      setTimeout(() => {
+        el.textContent = value;
+        el.style.opacity = 1;
+      }, 200);
+    }
+
+    // ----------------------------
+    // UI helper
+    // ----------------------------
+    function showUserPanel(username, ubbucks) {
+      document.getElementById("authPanel").style.display = "none";
+      document.getElementById("userPanel").style.display = "block";
+      document.getElementById("userNameLabel").innerText = username;
+      document.getElementById("ubbucksLabel").innerText = ubbucks;
+
+      // Start auto-refresh
+      setInterval(refreshBalance, 5000);
+    }
+
+    // ----------------------------
+    // Log out
+    // ----------------------------
     function logout() {
       localStorage.removeItem("user");
       document.getElementById("authPanel").style.display = "block";
       document.getElementById("userPanel").style.display = "none";
     }
 
-    // Auto-login if stored
+    // ----------------------------
+    // Auto-login
+    // ----------------------------
     window.onload = () => {
       const user = JSON.parse(localStorage.getItem("user"));
       if (user) {
         post({ action: "login", username: user.username, password: user.password }).then(res => {
           if (res && res.status === "ok") {
-            document.getElementById("authPanel").style.display = "none";
-            document.getElementById("userPanel").style.display = "block";
-            document.getElementById("userNameLabel").innerText = user.username;
-            document.getElementById("ubbucksLabel").innerText = res.UBbucks || 0;
+            showUserPanel(user.username, res.UBbucks || 0);
           } else {
             localStorage.removeItem("user");
           }
