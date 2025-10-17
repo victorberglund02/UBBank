@@ -19,6 +19,7 @@
       padding: 25px;
       border-radius: 12px;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      position: relative;
     }
     input {
       display: block;
@@ -46,6 +47,39 @@
     #ubbucksLabel {
       transition: opacity 0.3s ease;
     }
+
+    /* Simple loading overlay */
+    #loadingOverlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #2a7ae2;
+      display: none;
+    }
+
+    .spinner {
+      border: 4px solid #ccc;
+      border-top: 4px solid #2a7ae2;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      animation: spin 0.8s linear infinite;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -55,6 +89,7 @@
     <input id="password" type="password" placeholder="Password" />
     <button onclick="signup()">Sign Up</button>
     <button onclick="login()">Log In</button>
+    <div id="loadingOverlay"><div class="spinner"></div>Loading...</div>
   </div>
 
   <div class="container" id="userPanel">
@@ -67,33 +102,39 @@
     <button onclick="transfer()">Send</button>
 
     <button style="background:#555; margin-top:20px;" onclick="logout()">Log Out</button>
+    <div id="loadingOverlay"><div class="spinner"></div>Loading...</div>
   </div>
 
   <script>
-    // Replace this with your Cloudflare Worker URL
-    const API_URL = "https://google-proxy.doritoslove1337.workers.dev"; 
+    const API_URL = "https://google-proxy.doritoslove1337.workers.dev"; // your Cloudflare Worker URL
 
-    // ----------------------------
-    // Generic POST Helper
-    // ----------------------------
+    function showLoading(show) {
+      const panels = document.querySelectorAll(".container");
+      panels.forEach(panel => {
+        const overlay = panel.querySelector("#loadingOverlay");
+        if (overlay) overlay.style.display = show ? "flex" : "none";
+      });
+    }
+
     async function post(data) {
+      showLoading(true);
       try {
         const response = await fetch(API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(data)
         });
-        return await response.json();
+        const result = await response.json();
+        return result;
       } catch (err) {
         alert("Error communicating with server");
         console.error("POST error:", err);
         return null;
+      } finally {
+        showLoading(false);
       }
     }
 
-    // ----------------------------
-    // Sign up
-    // ----------------------------
     function signup() {
       const username = document.getElementById("username").value;
       const password = document.getElementById("password").value;
@@ -106,15 +147,15 @@
       });
     }
 
-    // ----------------------------
-    // Log in
-    // ----------------------------
     function login() {
       const username = document.getElementById("username").value;
       const password = document.getElementById("password").value;
       post({ action: "login", username, password }).then(res => {
         if (res && res.status === "ok") {
-          showUserPanel(username, res.UBbucks || 0);
+          document.getElementById("authPanel").style.display = "none";
+          document.getElementById("userPanel").style.display = "block";
+          document.getElementById("userNameLabel").innerText = username;
+          document.getElementById("ubbucksLabel").innerText = res.UBbucks || 0;
           localStorage.setItem("user", JSON.stringify({ username, password }));
         } else {
           alert(res?.message || "Login failed");
@@ -122,9 +163,6 @@
       });
     }
 
-    // ----------------------------
-    // Transfer UB-bucks
-    // ----------------------------
     function transfer() {
       const user = JSON.parse(localStorage.getItem("user"));
       if (!user) return alert("Please log in again.");
@@ -141,66 +179,28 @@
       }).then(res => {
         if (res && res.status === "ok") {
           alert(res.message);
-          refreshBalance(); // ✅ instantly refresh after sending
+          login(); // refresh balance
         } else {
           alert(res?.message || "Transfer failed");
         }
       });
     }
 
-    // ----------------------------
-    // Refresh balance
-    // ----------------------------
-    async function refreshBalance() {
-      const user = JSON.parse(localStorage.getItem("user"));
-      if (!user) return;
-      const res = await post({ action: "login", username: user.username, password: user.password });
-      if (res && res.status === "ok") {
-        updateBalanceDisplay(res.UBbucks || 0);
-      }
-    }
-
-    // Smooth fade balance update
-    function updateBalanceDisplay(value) {
-      const el = document.getElementById("ubbucksLabel");
-      el.style.opacity = 0.5;
-      setTimeout(() => {
-        el.textContent = value;
-        el.style.opacity = 1;
-      }, 200);
-    }
-
-    // ----------------------------
-    // UI helper
-    // ----------------------------
-    function showUserPanel(username, ubbucks) {
-      document.getElementById("authPanel").style.display = "none";
-      document.getElementById("userPanel").style.display = "block";
-      document.getElementById("userNameLabel").innerText = username;
-      document.getElementById("ubbucksLabel").innerText = ubbucks;
-
-      // Start auto-refresh
-      setInterval(refreshBalance, 2000);
-    }
-
-    // ----------------------------
-    // Log out
-    // ----------------------------
     function logout() {
       localStorage.removeItem("user");
       document.getElementById("authPanel").style.display = "block";
       document.getElementById("userPanel").style.display = "none";
     }
 
-    // ----------------------------
-    // Auto-login
-    // ----------------------------
     window.onload = () => {
       const user = JSON.parse(localStorage.getItem("user"));
       if (user) {
         post({ action: "login", username: user.username, password: user.password }).then(res => {
           if (res && res.status === "ok") {
-            showUserPanel(user.username, res.UBbucks || 0);
+            document.getElementById("authPanel").style.display = "none";
+            document.getElementById("userPanel").style.display = "block";
+            document.getElementById("userNameLabel").innerText = user.username;
+            document.getElementById("ubbucksLabel").innerText = res.UBbucks || 0;
           } else {
             localStorage.removeItem("user");
           }
