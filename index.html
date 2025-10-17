@@ -1,78 +1,155 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Mini Score System</title>
-<style>
-  body { font-family:sans-serif; max-width:400px; margin:40px auto; text-align:center; }
-  input,button { padding:8px; margin:4px; width:90%; font-size:16px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UBBank</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0e0e0e;
+      color: #fff;
+      text-align: center;
+      padding: 2em;
+    }
+    .box {
+      background: #1a1a1a;
+      padding: 1.5em;
+      border-radius: 10px;
+      width: 300px;
+      margin: 1em auto;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    }
+    input {
+      width: 90%;
+      padding: 10px;
+      margin: 5px 0;
+      border: none;
+      border-radius: 5px;
+    }
+    button {
+      width: 95%;
+      padding: 10px;
+      background: #00bfff;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #main, #transfer { display: none; }
+  </style>
 </head>
 <body>
-<h2>UB Bank for UB</h2>
+  <h1>UBBank</h1>
 
-<div id="auth">
-  <input id="user" placeholder="Username"><br>
-  <input id="pass" placeholder="Password" type="password"><br>
-  <button onclick="signup()">Sign Up</button>
-  <button onclick="login()">Log In</button>
-  <p id="authMsg"></p>
-</div>
+  <div id="auth" class="box">
+    <h2>Sign Up / Log In</h2>
+    <input id="username" placeholder="Username" />
+    <input id="password" type="password" placeholder="Password" />
+    <button onclick="signup()">Sign Up</button>
+    <button onclick="login()">Log In</button>
+  </div>
 
-<div id="panel" style="display:none;">
-  <h3>Welcome <span id="me"></span>!</h3>
-  <p>Your score: <span id="score">0</span></p>
-  <input id="toUser" placeholder="Send to username">
-  <input id="amount" placeholder="Amount" type="number">
-  <button onclick="send()">Send Score</button>
-  <p id="msg"></p>
-</div>
+  <div id="main" class="box">
+    <h2>Welcome, <span id="userDisplay"></span></h2>
+    <p>Your current score: <b id="scoreDisplay">0</b></p>
+    <input id="scoreInput" type="number" placeholder="Enter new score" />
+    <button onclick="updateScore()">Update Score</button>
+    <button onclick="showTransfer()">Send Score to User</button>
+  </div>
 
-<script>
-const url = "https://script.google.com/macros/s/AKfycbwLM3NpG8cvFs-qQto_VIhKtKv1g1zOfMOqnC0V32dNWyCtJVbg1c_oZ3BPw2virRtoRg/exec";
-let username = "", password = "";
+  <div id="transfer" class="box">
+    <h2>Send Score</h2>
+    <input id="targetUser" placeholder="Recipient Username" />
+    <input id="amount" type="number" placeholder="Score Amount" />
+    <button onclick="transfer()">Send</button>
+    <button onclick="back()">Back</button>
+  </div>
 
-async function signup() {
-  const u = val("user"), p = val("pass");
-  const res = await post({ action:"signup", username:u, password:p });
-  msg("authMsg", res);
-}
+  <script>
+    //Replace this with your Cloudflare Worker URL:
+    const API_URL = "https://google-proxy.doritoslove1337.workers.dev/";
 
-async function login() {
-  const u = val("user"), p = val("pass");
-  const res = await post({ action:"login", username:u, password:p });
-  if (res.username) {
-    username=u; password=p;
-    showPanel(res);
-  } else msg("authMsg", res);
-}
+    let currentUser = null;
+    let currentPassword = null;
 
-async function send() {
-  const to = val("toUser");
-  const amt = Number(val("amount"));
-  const res = await post({ action:"send", from:username, password, to, amount:amt });
-  msg("msg", res);
-  refresh();
-}
+    async function post(action, body = {}) {
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action, ...body }),
+        });
+        return await res.json();
+      } catch (err) {
+        console.error("POST error:", err);
+        alert("Error communicating with server.");
+      }
+    }
 
-async function refresh() {
-  const res = await post({ action:"login", username, password });
-  if (res.username) document.getElementById("score").textContent = res.score;
-}
+    async function signup() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      if (!username || !password) return alert("Enter username and password.");
 
-function val(id){ return document.getElementById(id).value.trim(); }
-function msg(id,t){ document.getElementById(id).textContent = typeof t==="string"?t:JSON.stringify(t); }
-function showPanel(u){ 
-  document.getElementById("auth").style.display="none";
-  document.getElementById("panel").style.display="block";
-  document.getElementById("me").textContent=u.username;
-  document.getElementById("score").textContent=u.score;
-}
+      const res = await post("signup", { username, password });
+      if (res.status === "ok") {
+        alert("Signup successful!");
+        login();
+      } else {
+        alert(res.message || "Signup failed");
+      }
+    }
 
-async function post(data){
-  const r = await fetch(url,{method:"POST",headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-  return r.json();
-}
-</script>
+    async function login() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value.trim();
+      if (!username || !password) return alert("Enter username and password.");
+
+      const res = await post("login", { username, password });
+      if (res.status === "ok") {
+        currentUser = username;
+        currentPassword = password;
+        document.getElementById("auth").style.display = "none";
+        document.getElementById("main").style.display = "block";
+        document.getElementById("userDisplay").innerText = username;
+        document.getElementById("scoreDisplay").innerText = res.score || 0;
+      } else {
+        alert(res.message || "Login failed");
+      }
+    }
+
+    async function updateScore() {
+      const newScore = Number(document.getElementById("scoreInput").value);
+      if (isNaN(newScore)) return alert("Enter a valid score.");
+      const res = await post("updateScore", { username: currentUser, password: currentPassword, score: newScore });
+      if (res.status === "ok") {
+        document.getElementById("scoreDisplay").innerText = newScore;
+        alert("Score updated!");
+      } else {
+        alert(res.message || "Failed to update score.");
+      }
+    }
+
+    function showTransfer() {
+      document.getElementById("main").style.display = "none";
+      document.getElementById("transfer").style.display = "block";
+    }
+
+    async function transfer() {
+      const targetUser = document.getElementById("targetUser").value.trim();
+      const amount = Number(document.getElementById("amount").value);
+      if (!targetUser || isNaN(amount)) return alert("Enter valid details.");
+      const res = await post("transfer", { username: currentUser, password: currentPassword, targetUser, amount });
+      alert(res.message || "Transfer complete.");
+      back();
+    }
+
+    function back() {
+      document.getElementById("transfer").style.display = "none";
+      document.getElementById("main").style.display = "block";
+    }
+  </script>
 </body>
 </html>
