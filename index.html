@@ -179,7 +179,9 @@
       }).then(res => {
         if (res && res.status === "ok") {
           alert(res.message);
-          login(); // refresh balance
+          const currentBalance = parseFloat(document.getElementById("ubbucksLabel").innerText) || 0;
+          const newBalance = currentBalance - amount;
+          document.getElementById("ubbucksLabel").innerText = newBalance.toFixed(2);
         } else {
           alert(res?.message || "Transfer failed");
         }
