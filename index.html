@@ -164,30 +164,35 @@
       });
     }
 
-    function transfer() {
-      const user = JSON.parse(localStorage.getItem("user"));
-      if (!user) return alert("Please log in again.");
-      const targetUser = document.getElementById("targetUser").value;
-      const amount = parseFloat(document.getElementById("amount").value);
-      if (!targetUser || !amount || amount <= 0) return alert("Enter a valid recipient and amount.");
+function transfer() {
+  const user = JSON.parse(localStorage.getItem("user"));
+  if (!user) return alert("Please log in again.");
+  const targetUser = document.getElementById("targetUser").value.trim();
+  const amount = parseFloat(document.getElementById("amount").value);
+  if (!targetUser || !amount || amount <= 0) return alert("Enter a valid recipient and amount.");
 
-      post({ 
-        action: "transfer", 
-        username: user.username, 
-        password: user.password, 
-        targetUser, 
-        amount 
-      }).then(res => {
-        if (res && res.status === "ok") {
-          alert(res.message);
-          const currentBalance = parseFloat(document.getElementById("ubbucksLabel").innerText) || 0;
-          const newBalance = currentBalance - amount;
-          document.getElementById("ubbucksLabel").innerText = newBalance.toFixed(2);
-        } else {
-          alert(res?.message || "Transfer failed");
-        }
-      });
+  // client-side block (UX only)
+  if (targetUser.toLowerCase() === user.username.toLowerCase()) {
+    return alert("You cannot send UB-bucks to yourself.");
+  }
+
+  post({ 
+    action: "transfer", 
+    username: user.username, 
+    password: user.password, 
+    targetUser, 
+    amount 
+  }).then(res => {
+    if (res && res.status === "ok") {
+      alert(res.message);
+      // update displayed balance locally or fetch fresh value
+      const currentBalance = parseFloat(document.getElementById("ubbucksLabel").innerText) || 0;
+      document.getElementById("ubbucksLabel").innerText = (currentBalance - amount).toFixed(2);
+    } else {
+      alert(res?.message || "Transfer failed");
     }
+  });
+}
 
     function logout() {
       localStorage.removeItem("user");
